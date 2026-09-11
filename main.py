@@ -1,33 +1,69 @@
+from fastapi import FastAPI, HTTPException, Depends
+from decimal import Decimal
+from datetime import datetime, timezone
+from sqlalchemy import create_engine, Column, String, Numeric, DateTime
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, Session
+
+# --- DATABASE SETUP ---
+SQLALCHEMY_DATABASE_URL = "sqlite:///./swiftbux_secure.db"
+engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+class DBUser(Base):
+    __tablename__ = "secure_users"
+    id = Column(String, primary_key=True, index=True)
+    balance = Column(Numeric(10, 2), default=Decimal("117.00"))
+    currency = Column(String, default="NGN")
+    referral_code = Column(String, unique=True, index=True)
+    referred_by = Column(String, nullable=True)
+    created_at = Column(DateTime, default=datetime.now(timezone.utc))
+
+Base.metadata.create_all(bind=engine)
+
+# --- FASTAPI APP INITIALIZATION ---
+app = FastAPI(title="SwiftBux API")
+
+# Dependency
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+# --- ROUTES ---
+@app.get("/")
+def read_root():
+    return {"message": "SwiftBux API is live and secure!"}
+
 @app.post("/tasks/claim-reward")
 async def claim_task_reward(
-    user_id: uuid.UUID, 
-    task_id: str, 
-    base_ad_revenue: float, # What the ad network paid you for this view
-    db: AsyncSession = Depends(get_db)
+    user_id: str,
+    task_id: str,
+    base_ad_revenue: float,
+    db: Session = Depends(get_db)
 ):
     try:
         base_value = Decimal(str(base_ad_revenue))
         
-        # Calculate dynamic payout based on user's age/status
-        user_payout, platform_cut = await calculate_task_payout(db, user_id, base_value)
+        # Simple balance lookup or creation
+        user = db.query(DBUser).filter(DBUser.id == user_id).first()
+        if not user:
+            user = DBUser(id=user_id, balance=Decimal("0.00"))
+            db.add(user)
+            db.commit()
+            db.refresh(user)
 
-        # Idempotency check & Ledger insertion
-        # (Using the atomic ledger design from our previous setup)
-        user_entry = LedgerEntry(
-            user_id=user_id,
-            amount=user_payout,
-            type=TransactionType.EARN_TASK,
-            reference_id=f"task_{task_id}"
-        )
+        user.balance += base_value
+        db.commit()
         
-        db.add(user_entry)
-        await db.commit()
-
         return {
-            "status": "success", 
-            "earned": float(user_payout),
-            "promo_active": user_payout > (base_value * Decimal("0.40")) # Tell frontend if they are still boosted
+            "status": "success",
+            "user_id": user_id,
+            "new_balance": float(user.balance)
         }
     except Exception as e:
-        await db.rollback()
+        db.rollback()
         raise HTTPException(status_code=400, detail=str(e))
