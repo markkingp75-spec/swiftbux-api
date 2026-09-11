@@ -6,7 +6,7 @@ from decimal import Decimal
 from sqlalchemy import create_engine, Column, String, Numeric, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
-
+app = FastAPI()
 # --- DATABASE SETUP ---
 SQLALCHEMY_DATABASE_URL = "sqlite:///./swiftbux_secure.db"
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
