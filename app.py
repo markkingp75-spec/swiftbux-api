@@ -4,29 +4,29 @@ import threading
 import uvicorn
 
 # Initialize FastAPI backend app
-api = FastAPI(title="NairaPulse Reward API")
+app = FastAPI(title="NairaPulse Reward API")
 
 # Simple in-memory user ledger for testing
 users_db = {"user_123": 0.0}
 
-@api.get("/")
+@app.get("/")
 def read_root():
     return {"message": "NairaPulse API is live!"}
 
-@api.post("/earn/{user_id}")
+@app.post("/earn/{user_id}")
 def earn_reward(user_id: str, amount: float):
     if user_id not in users_db:
         users_db[user_id] = 0.0
     users_db[user_id] += amount
     return {"status": "success", "new_balance": users_db[user_id]}
 
-@api.get("/balance/{user_id}")
+@app.get("/balance/{user_id}")
 def get_balance(user_id: str):
     return {"user_id": user_id, "balance": users_db.get(user_id, 0.0)}
 
 # Run FastAPI in the background thread so Streamlit can run concurrently
 def run_fastapi():
-    uvicorn.run(api, host="127.0.0.1", port=8000, log_level="warning")
+    uvicorn.run(app, host="127.0.0.1", port=8000, log_level="warning")
 
 @st.cache_resource
 def start_server():
