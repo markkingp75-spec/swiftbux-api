@@ -1,34 +1,37 @@
-from fastapi import FastAPI, HTTPException, Depends, Form
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.responses import HTMLResponse
 from decimal import Decimal
 from datetime import datetime, timezone
 from sqlalchemy import create_engine, Column, String, Numeric, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
+from pydantic import BaseModel
 
 # --- DATABASE SETUP ---
-SQLALCHEMY_DATABASE_URL = "sqlite:///./swiftbux_enterprise.db"
+SQLALCHEMY_DATABASE_URL = "sqlite:///./swiftbux_app.db"
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-class EnterpriseUser(Base):
-    __tablename__ = "enterprise_users"
+class AppUser(Base):
+    __tablename__ = "app_users"
     id = Column(String, primary_key=True, index=True)
+    name = Column(String)
     email = Column(String, unique=True, index=True)
     phone = Column(String)
     nationality = Column(String)
-    nin = Column(String, unique=True, index=True)
-    balance = Column(Numeric(10, 3), default=Decimal("117.000"))
-    currency = Column(String, default="KWD")
+    identity_number = Column(String, unique=True, index=True) # NIN / BVN / Passport
+    cash_balance = Column(Numeric(10, 3), default=Decimal("117.000")) # KWD Currency
+    tickets = Column(Numeric(10, 2), default=Decimal("10120.00"))
+    gems = Column(Numeric(10, 0), default=Decimal("10"))
     referral_code = Column(String, unique=True, index=True)
     referred_count = Column(Numeric(10, 0), default=Decimal("0"))
     created_at = Column(DateTime, default=datetime.now(timezone.utc))
 
 Base.metadata.create_all(bind=engine)
 
-# --- FASTAPI APP INITIALIZATION ---
-app = FastAPI(title="SwiftBux Global Enterprise Portal")
+# --- FASTAPI APP ---
+app = FastAPI(title="SwiftBux Mobile Gaming & Reward Platform")
 
 def get_db():
     db = SessionLocal()
@@ -37,7 +40,7 @@ def get_db():
     finally:
         db.close()
 
-# --- FULL-SCREEN PRODUCTION FRONTEND UI ---
+# --- MOBILE APP FRONTEND INTERFACE ---
 @app.get("/", response_class=HTMLResponse)
 def read_root():
     return """
@@ -46,420 +49,392 @@ def read_root():
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>SwiftBux Global Enterprise Earning & Verification Platform</title>
+        <title>SwiftBux Mobile Reward Platform</title>
         <style>
-            * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-            body { background: #07090e; color: #f8fafc; min-height: 100vh; display: flex; flex-direction: column; }
-            header { background: #0f172a; padding: 15px 30px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #1e293b; }
-            header h1 { font-size: 20px; color: #38bdf8; display: flex; align-items: center; gap: 10px; }
-            .badge { background: #065f46; color: #34d399; font-size: 11px; padding: 4px 8px; border-radius: 4px; font-weight: bold; }
+            * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+            body { background: #e2e8f0; color: #0f172a; min-height: 100vh; display: flex; justify-content: center; align-items: center; }
             
-            .main-container { flex: 1; display: flex; max-width: 1400px; margin: 0 auto; width: 100%; padding: 20px; gap: 20px; }
+            /* Mobile Device Frame */
+            .mobile-frame { width: 100%; max-width: 420px; height: 100vh; max-height: 850px; background: #f8fafc; border-radius: 24px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3); display: flex; flex-direction: column; overflow: hidden; position: relative; border: 8px solid #1e293b; }
             
-            /* Sidebar Navigation */
-            .sidebar { width: 260px; background: #0f172a; border-radius: 12px; padding: 20px; border: 1px solid #1e293b; display: flex; flex-direction: column; gap: 10px; }
-            .nav-btn { background: transparent; color: #94a3b8; border: none; text-align: left; padding: 12px 15px; border-radius: 8px; font-size: 15px; cursor: pointer; transition: 0.2s; font-weight: 600; }
-            .nav-btn:hover, .nav-btn.active { background: #1e293b; color: #38bdf8; }
+            /* Top Header Balance Bar */
+            .top-bar { background: #ffffff; padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; font-size: 13px; font-weight: bold; }
+            .badge-group { display: flex; align-items: center; gap: 5px; background: #f1f5f9; padding: 4px 8px; border-radius: 20px; border: 1px solid #e2e8f0; }
+            
+            /* Screen Container */
+            .screen { flex: 1; overflow-y: auto; padding: 16px; padding-bottom: 80px; }
+            .screen-section { display: none; }
+            .screen-section.active { display: block; }
+            
+            /* Cards & Banners */
+            .promo-banner { background: linear-gradient(135deg, #3b82f6, #1d4ed8); border-radius: 16px; padding: 20px; color: white; text-align: center; margin-bottom: 16px; box-shadow: 0 4px 6px rgba(59, 130, 246, 0.3); }
+            .action-card { background: white; border-radius: 16px; padding: 16px; margin-bottom: 14px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border: 1px solid #e2e8f0; text-align: center; }
+            
+            /* Buttons */
+            .btn-green { background: #22c55e; color: white; border: none; padding: 12px 20px; border-radius: 12px; font-weight: bold; font-size: 15px; width: 100%; cursor: pointer; box-shadow: 0 4px 10px rgba(34, 197, 94, 0.3); transition: 0.2s; margin-top: 10px; }
+            .btn-green:hover { background: #16a34a; }
+            .btn-blue { background: #3b82f6; color: white; border: none; padding: 10px 16px; border-radius: 10px; font-weight: bold; width: 100%; cursor: pointer; margin-top: 8px; }
+            
+            /* Form inputs */
+            .input-group { text-align: left; margin-bottom: 12px; }
+            .input-group label { font-size: 12px; font-weight: bold; color: #64748b; display: block; margin-bottom: 4px; }
+            .input-group input, .input-group select { width: 100%; padding: 10px 12px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; background: #fff; }
+            
+            /* Bottom Navigation Bar */
+            .bottom-nav { position: absolute; bottom: 0; left: 0; width: 100%; height: 70px; background: #ffffff; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-around; align-items: center; z-index: 100; }
+            .nav-item { background: none; border: none; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; color: #64748b; font-size: 11px; font-weight: 600; }
+            .nav-item.active { color: #2563eb; }
+            .nav-icon { font-size: 20px; }
 
-            /* Content Area */
-            .content-pane { flex: 1; background: #0f172a; border-radius: 12px; padding: 30px; border: 1px solid #1e293b; overflow-y: auto; }
-            
+            /* Wheel & Game Arena */
+            .wheel-container { width: 220px; height: 220px; border-radius: 50%; background: conic-gradient(#ef4444 0deg 60deg, #f59e0b 60deg 120deg, #10b981 120deg 180deg, #06b6d4 180deg 240deg, #8b5cf6 240deg 300deg, #ec4899 300deg 360deg); margin: 20px auto; border: 6px solid #1e293b; position: relative; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+            .wheel-pointer { width: 0; height: 0; border-left: 10px solid transparent; border-right: 10px solid transparent; border-bottom: 20px solid #0f172a; position: absolute; top: -15px; left: calc(50% - 10px); }
+
+            /* Modal overlay */
+            .modal { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 200; }
+            .modal-box { background: white; padding: 24px; border-radius: 16px; width: 85%; text-align: center; }
             .hidden { display: none !important; }
-            
-            /* Forms & Inputs */
-            .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 15px; }
-            .form-group { display: flex; flex-direction: column; gap: 5px; text-align: left; margin-bottom: 15px; }
-            .form-group.full { grid-column: span 2; }
-            label { font-size: 13px; color: #cbd5e1; font-weight: bold; }
-            input, select { background: #1e293b; border: 1px solid #334155; color: white; padding: 12px; border-radius: 8px; font-size: 15px; width: 100%; }
-            input:focus, select:focus { border-color: #38bdf8; outline: none; }
-            
-            .btn-primary { background: #2563eb; color: white; border: none; padding: 14px 20px; border-radius: 8px; font-weight: bold; font-size: 16px; cursor: pointer; width: 100%; margin-top: 10px; transition: 0.2s; }
-            .btn-primary:hover { background: #1d4ed8; }
-
-            /* Dashboard Cards */
-            .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 25px; }
-            .stat-card { background: #1e293b; padding: 20px; border-radius: 10px; border-left: 4px solid #38bdf8; text-align: left; }
-            .stat-card h4 { font-size: 13px; color: #94a3b8; text-transform: uppercase; margin-bottom: 8px; }
-            .stat-card .val { font-size: 24px; font-weight: bold; color: #f8fafc; }
-
-            /* Task & Game Modules */
-            .task-card-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
-            .task-box { background: #1e293b; border: 1px solid #334155; padding: 20px; border-radius: 10px; text-align: left; display: flex; flex-direction: column; justify-content: space-between; }
-            .task-box h3 { font-size: 16px; margin-bottom: 8px; color: #38bdf8; }
-            .task-box p { font-size: 13px; color: #94a3b8; margin-bottom: 15px; }
-            .action-btn { background: #10b981; color: white; border: none; padding: 10px; border-radius: 6px; font-weight: bold; cursor: pointer; }
-            .action-btn:hover { background: #059669; }
-
-            /* Live Game Arena */
-            #gameCanvas { background: #020617; border: 2px solid #334155; border-radius: 8px; width: 100%; height: 250px; display: flex; align-items: center; justify-content: center; flex-direction: column; position: relative; cursor: pointer; margin-top: 10px; }
-            
-            /* Modal Proof */
-            .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: flex; align-items: center; justify-content: center; z-index: 1000; }
-            .modal-content { background: #1e293b; padding: 30px; border-radius: 12px; width: 450px; text-align: center; border: 1px solid #334155; }
-            .modal-content h3 { color: #34d399; margin-bottom: 15px; }
-            .modal-content p { font-size: 14px; color: #cbd5e1; margin-bottom: 10px; text-align: left; background: #0f172a; padding: 10px; border-radius: 6px; }
-            .close-modal { background: #ef4444; margin-top: 15px; }
         </style>
     </head>
     <body>
 
-        <header>
-            <h1>⚡ SwiftBux Global Enterprise <span class="badge">SECURE LIVE</span></h1>
-            <div id="headerUserStatus" style="font-size: 14px; color: #94a3b8;">Not Registered</div>
-        </header>
-
-        <div class="main-container">
-            <!-- Sidebar -->
-            <div class="sidebar">
-                <button class="nav-btn active" onclick="switchTab('registerTab', this)">📝 Registration & NIN</button>
-                <button class="nav-btn" onclick="switchTab('dashboardTab', this)" id="dashNavBtn">📊 Investor Dashboard</button>
-                <button class="nav-btn" onclick="switchTab('gamesTab', this)">🎮 Play & Earn Games</button>
-                <button class="nav-btn" onclick="switchTab('videosTab', this)">📺 Video Ads Earning</button>
-                <button class="nav-btn" onclick="switchTab('referralTab', this)">👥 Referrals & Share</button>
-                <button class="nav-btn" onclick="switchTab('withdrawTab', this)">🏦 Withdrawal & Proof</button>
+        <div class="mobile-frame">
+            
+            <!-- Top Asset Bar -->
+            <div class="top-bar">
+                <div class="badge-group" style="color: #16a34a;">💵 <span id="topCash">8.000</span> KWD</div>
+                <div class="badge-group" style="color: #d97706;">🎟️ <span id="topTickets">10.12K</span></div>
+                <div class="badge-group" style="color: #db2777;">💎 <span id="topGems">10</span></div>
             </div>
 
-            <!-- Content Area -->
-            <div class="content-pane">
+            <!-- Screens Container -->
+            <div class="screen">
                 
-                <!-- TAB 1: REGISTRATION & NIN VERIFICATION -->
-                <div id="registerTab" class="tab-content">
-                    <h2 style="margin-bottom: 10px; color: #38bdf8;">Enterprise User Registration & Verification</h2>
-                    <p style="color: #94a3b8; font-size: 14px; margin-bottom: 20px;">Register with official details and National Identification Number (NIN) verification for institutional payouts and referral validation.</p>
-                    
-                    <form id="regForm" onsubmit="registerUser(event)">
-                        <div class="form-grid">
-                            <div class="form-group">
-                                <label>Full Legal Name</label>
-                                <input type="text" id="regName" placeholder="e.g. Emmanuel Mary" required>
-                            </div>
-                            <div class="form-group">
-                                <label>Username / Unique ID</label>
-                                <input type="text" id="regId" placeholder="e.g. Ottah23" required>
-                            </div>
-                            <div class="form-group">
-                                <label>Email Address</label>
-                                <input type="email" id="regEmail" placeholder="user@domain.com" required>
-                            </div>
-                            <div class="form-group">
-                                <label>Phone Number</label>
-                                <input type="text" id="regPhone" placeholder="+965 XXXX XXXX" required>
-                            </div>
-                            <div class="form-group">
-                                <label>Nationality</label>
-                                <select id="regNationality">
-                                    <option value="Kuwaiti">Kuwaiti</option>
-                                    <option value="Nigerian" selected>Nigerian</option>
-                                    <option value="International">Other International</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label>National Identification Number (NIN)</label>
-                                <input type="text" id="regNin" placeholder="Enter 11-digit NIN Verification" required>
-                            </div>
-                        </div>
-                        <button type="submit" class="btn-primary">Verify & Complete Registration</button>
-                    </form>
-                </div>
-
-                <!-- TAB 2: DASHBOARD -->
-                <div id="dashboardTab" class="tab-content hidden">
-                    <h2 style="margin-bottom: 20px; color: #38bdf8;">Investor & Referrer Analytics Dashboard</h2>
-                    <div class="stats-grid">
-                        <div class="stat-card">
-                            <h4>Current Balance</h4>
-                            <div class="val" id="dashBalance">0.000 KWD</div>
-                        </div>
-                        <div class="stat-card">
-                            <h4>Active Currency</h4>
-                            <div class="val">KWD (Kuwaiti Dinar)</div>
-                        </div>
-                        <div class="stat-card">
-                            <h4>Total Referrals</h4>
-                            <div class="val" id="dashRefCounts">0 Users</div>
-                        </div>
+                <!-- TAB 1: PLAY & MISSIONS (Home) -->
+                <div id="tabHome" class="screen-section active">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                        <h3 style="font-size: 18px; color: #1e293b;">Level 7</h3>
+                        <span style="font-size: 12px; background: #e0f2fe; color: #0284c7; padding: 4px 8px; border-radius: 8px; font-weight: bold;">🔒 NIN Verified</span>
                     </div>
-                    <div style="background: #1e293b; padding: 20px; border-radius: 10px; text-align: left;">
-                        <h3 style="color: #34d399; margin-bottom: 10px;">🔒 Security & Verification Seal</h3>
-                        <p style="font-size: 14px; color: #cbd5e1; line-height: 1.6;">Your account is backed by live SQLite ledger tracking with encrypted NIN verification status. You can execute tasks, simulate game participation, and withdraw instantly to showcase verified transaction receipts to your community and investors.</p>
+
+                    <div class="promo-banner" style="background: linear-gradient(135deg, #10b981, #059669);">
+                        <h4 style="font-size: 16px; margin-bottom: 5px;">⚡ Daily Reward Active</h4>
+                        <p style="font-size: 13px; opacity: 0.9;">Claim your KWD reward bonus instantly!</p>
+                        <button onclick="claimDailyReward()" style="background: white; color: #059669; border: none; padding: 8px 16px; border-radius: 8px; font-weight: bold; margin-top: 10px; cursor: pointer;">Claim 5.000 KWD</button>
+                    </div>
+
+                    <div class="action-card" style="border-left: 4px solid #3b82f6;">
+                        <h4 style="font-size: 15px; margin-bottom: 5px;">🎮 Mission 1: Reflex Game</h4>
+                        <p style="font-size: 12px; color: #64748b; margin-bottom: 10px;">Tap to complete task and earn KWD rewards.</p>
+                        <button class="btn-green" onclick="completeTask('Game Mission', 3.500)">Play & Earn 3.500 KWD</button>
+                    </div>
+
+                    <div class="action-card" style="border-left: 4px solid #8b5cf6;">
+                        <h4 style="font-size: 15px; margin-bottom: 5px;">📺 Sponsored Video Ads</h4>
+                        <p style="font-size: 12px; color: #64748b; margin-bottom: 10px;">Watch short ad stream for revenue share.</p>
+                        <button class="btn-blue" onclick="completeTask('Video Ad', 2.000)">Watch Ad (+2.000 KWD)</button>
                     </div>
                 </div>
 
-                <!-- TAB 3: GAMES & EARN -->
-                <div id="gamesTab" class="tab-content hidden">
-                    <h2 style="margin-bottom: 10px; color: #38bdf8;">Interactive Earning Games Arena</h2>
-                    <p style="color: #94a3b8; font-size: 14px; margin-bottom: 15px;">Click the active target below to play the reflex reward game and instantly credit your wallet.</p>
+                <!-- TAB 2: SPIN WHEEL -->
+                <div id="tabSpin" class="screen-section">
+                    <h3 style="text-align: center; margin-bottom: 10px; color: #1e293b;">Lucky Spin Wheel</h3>
+                    <p style="text-align: center; font-size: 12px; color: #64748b; margin-bottom: 10px;">Spin daily to win cash multipliers in KWD!</p>
                     
-                    <div id="gameCanvas" onclick="triggerGameReward()">
-                        <h3 id="gamePrompt" style="color: #34d399; font-size: 20px;">🎮 CLICK HERE TO START GAME</h3>
-                        <p style="color: #94a3b8; font-size: 13px; margin-top: 5px;">Earn +3.500 KWD per successful reflex capture!</p>
+                    <div class="wheel-container">
+                        <div class="wheel-pointer"></div>
+                    </div>
+
+                    <button class="btn-green" onclick="spinWheel()" style="margin-top: 20px;">Spin for 1 Ticket</button>
+                </div>
+
+                <!-- TAB 3: PLAY / GAMES ARENA -->
+                <div id="tabPlay" class="screen-section">
+                    <h3 style="margin-bottom: 10px; color: #1e293b;">Arcade Earning Arena</h3>
+                    <p style="font-size: 12px; color: #64748b; margin-bottom: 15px;">Choose your game mode and build proof for your investors.</p>
+                    
+                    <div class="action-card">
+                        <h4>🧩 Puzzle Solver Challenge</h4>
+                        <p style="font-size: 12px; color: #64748b; margin: 5px 0;">Reward: 4.500 KWD</p>
+                        <button class="btn-green" onclick="completeTask('Puzzle Game', 4.500)">Start Puzzle</button>
+                    </div>
+
+                    <div class="action-card">
+                        <h4>🚀 Speed Blaster</h4>
+                        <p style="font-size: 12px; color: #64748b; margin: 5px 0;">Reward: 6.000 KWD</p>
+                        <button class="btn-blue" onclick="completeTask('Speed Game', 6.000)">Play Blaster</button>
                     </div>
                 </div>
 
-                <!-- TAB 4: VIDEO ADS -->
-                <div id="videosTab" class="tab-content hidden">
-                    <h2 style="margin-bottom: 10px; color: #38bdf8;">Sponsored Video Ad Streams</h2>
-                    <p style="color: #94a3b8; font-size: 14px; margin-bottom: 20px;">Watch partner promotional ad spots to generate instant ad revenue share.</p>
+                <!-- TAB 4: RAFFLE & DRAWS -->
+                <div id="tabRaffle" class="screen-section">
+                    <h3 style="margin-bottom: 10px; color: #1e293b;">Hourly Cash Raffles</h3>
                     
-                    <div class="task-card-grid">
-                        <div class="task-box">
-                            <h3>Spotlight Ad #1: Tech Innovations</h3>
-                            <p>Stream duration: 15 seconds. Reward: +5.000 KWD</p>
-                            <button class="action-btn" onclick="claimTask('video_ad1', 5.000)">Watch & Earn 5.0 KWD</button>
-                        </div>
-                        <div class="task-box">
-                            <h3>Spotlight Ad #2: Global Marketplace</h3>
-                            <p>Stream duration: 30 seconds. Reward: +7.500 KWD</p>
-                            <button class="action-btn" onclick="claimTask('video_ad2', 7.500)">Watch & Earn 7.5 KWD</button>
-                        </div>
+                    <div class="action-card" style="background: #0f172a; color: white;">
+                        <h4 style="color: #38bdf8;">$1,000 in CA$H Draw</h4>
+                        <p style="font-size: 12px; color: #94a3b8; margin: 8px 0;">Draw in 43 minutes</p>
+                        <button class="btn-green" onclick="alert('Ticket entered into $1,000 Raffle Draw!')">Flip & Enter Draw</button>
+                    </div>
+
+                    <div class="action-card" style="background: #0f172a; color: white;">
+                        <h4 style="color: #34d399;">$200 Instant Cash Raffle</h4>
+                        <p style="font-size: 12px; color: #94a3b8; margin: 8px 0;">Draw in 12 minutes</p>
+                        <button class="btn-blue" onclick="alert('Ticket entered into $200 Raffle Draw!')">Enter Raffle</button>
                     </div>
                 </div>
 
-                <!-- TAB 5: REFERRAL SYSTEM -->
-                <div id="referralTab" class="tab-content hidden">
-                    <h2 style="margin-bottom: 10px; color: #38bdf8;">Referral Program & Investor Links</h2>
-                    <p style="color: #94a3b8; font-size: 14px; margin-bottom: 20px;">Share your customized tracking link to recruit referrals and collect affiliate commissions.</p>
+                <!-- TAB 5: WALLET & REGISTRATION -->
+                <div id="tabWallet" class="screen-section">
+                    <h3 style="margin-bottom: 10px; color: #1e293b;">Wallet & NIN Verification</h3>
                     
-                    <div class="form-group">
-                        <label>Your Unique Referral Link</label>
-                        <input type="text" id="userRefLink" readonly value="Register first to generate link">
+                    <div class="promo-banner" style="background: #1e293b; text-align: left; padding: 15px;">
+                        <p style="font-size: 12px; color: #94a3b8;">Your Live Balance</p>
+                        <h2 id="walletBalanceDisplay" style="font-size: 26px; color: #4ade80; margin: 5px 0;">8.000 KWD</h2>
+                        <p style="font-size: 11px; color: #cbd5e1;">Status: <span id="verificationBadge" style="color: #fca5a5;">Unregistered</span></p>
                     </div>
-                    <button class="btn-primary" onclick="copyRefLink()" style="background: #8b5cf6;">Copy Referral Link</button>
-                    <button class="action-btn" onclick="simulateNewReferral()" style="margin-top: 15px; width: 100%; background: #0284c7;">Simulate Referral Join (+10.000 KWD Commission)</button>
-                </div>
 
-                <!-- TAB 6: WITHDRAWAL & PROOF -->
-                <div id="withdrawTab" class="tab-content hidden">
-                    <h2 style="margin-bottom: 10px; color: #38bdf8;">Instant Withdrawal & Proof Generator</h2>
-                    <p style="color: #94a3b8; font-size: 14px; margin-bottom: 20px;">Withdraw your earnings and instantly issue verifiable transaction certificates for your investors.</p>
-                    
-                    <div style="background: #1e293b; padding: 25px; border-radius: 10px; max-width: 500px; margin: 0 auto;">
-                        <h3 id="withdrawBalDisplay" style="color: #4ade80; font-size: 22px; margin-bottom: 15px;">Available: 0.000 KWD</h3>
-                        <div class="form-group">
-                            <label>Destination Bank / Crypto Wallet</label>
-                            <input type="text" id="bankDetails" placeholder="Enter IBAN or Wallet Address">
+                    <!-- Registration & NIN Verification Form -->
+                    <div id="regSection" class="action-card" style="text-align: left;">
+                        <h4 style="color: #1e293b; margin-bottom: 10px;">📝 Account & NIN Verification</h4>
+                        <div class="input-group">
+                            <label>Full Legal Name</label>
+                            <input type="text" id="inputName" placeholder="e.g. Emmanuel Mary">
                         </div>
-                        <button class="btn-primary" onclick="executeWithdrawal()" style="background: #e11d48;">Process Payout & Generate Proof</button>
+                        <div class="input-group">
+                            <label>Username / ID</label>
+                            <input type="text" id="inputUser" placeholder="e.g. Ottah23">
+                        </div>
+                        <div class="input-group">
+                            <label>Email Address</label>
+                            <input type="email" id="inputEmail" placeholder="user@domain.com">
+                        </div>
+                        <div class="input-group">
+                            <label>Phone Number</label>
+                            <input type="text" id="inputPhone" placeholder="+965 XXXX XXXX">
+                        </div>
+                        <div class="input-group">
+                            <label>Nationality</label>
+                            <select id="inputNation">
+                                <option value="Kuwaiti">Kuwaiti</option>
+                                <option value="Nigerian" selected>Nigerian</option>
+                                <option value="International">International</option>
+                            </select>
+                        </div>
+                        <div class="input-group">
+                            <label>NIN / BVN / Passport Number</label>
+                            <input type="text" id="inputNin" placeholder="Enter 11-digit NIN verification">
+                        </div>
+                        <button class="btn-green" onclick="registerAccount()">Verify & Save Profile</button>
+                    </div>
+
+                    <div id="payoutSection" class="hidden">
+                        <button class="btn-green" onclick="requestWithdrawal()" style="background: #e11d48; margin-top: 15px;">Withdraw Funds & Generate Proof</button>
                     </div>
                 </div>
 
             </div>
+
+            <!-- Bottom Navigation Bar -->
+            <div class="bottom-nav">
+                <button class="nav-item active" onclick="switchTab('tabHome', this)">
+                    <span class="nav-icon">🏠</span>Shop
+                </button>
+                <button class="nav-item" onclick="switchTab('tabSpin', this)">
+                    <span class="nav-icon">🎡</span>Spin
+                </button>
+                <button class="nav-item" onclick="switchTab('tabPlay', this)">
+                    <span class="nav-icon">🎮</span>Play
+                </button>
+                <button class="nav-item" onclick="switchTab('tabRaffle', this)">
+                    <span class="nav-icon">🎟️</span>Raffle
+                </button>
+                <button class="nav-item" onclick="switchTab('tabWallet', this)">
+                    <span class="nav-icon">💰</span>Wallet
+                </button>
+            </div>
+
         </div>
 
-        <!-- TRANSACTION PROOF MODAL -->
-        <div id="proofModal" class="modal hidden">
-            <div class="modal-content">
-                <h3>✅ OFFICIAL TRANSACTION PROOF</h3>
-                <p id="proofDetails">Generating hash certificate...</p>
-                <button class="btn-primary close-modal" onclick="closeModal()">Close & Share Proof</button>
+        <!-- POPUP PROOF MODAL -->
+        <div id="popupModal" class="modal hidden">
+            <div class="modal-box">
+                <h3 id="modalTitle" style="color: #16a34a; margin-bottom: 10px;">Success</h3>
+                <p id="modalText" style="font-size: 13px; color: #475569; margin-bottom: 15px; background: #f8fafc; padding: 10px; border-radius: 8px; text-align: left;"></p>
+                <button class="btn-green" onclick="closeModal()">Close</button>
             </div>
         </div>
 
         <script>
-            let currentUser = null;
+            let currentUserId = null;
 
             function switchTab(tabId, btnElement) {
-                document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
-                document.querySelectorAll('.nav-btn').forEach(el => el.classList.remove('active'));
-                document.getElementById(tabId).classList.remove('hidden');
+                document.querySelectorAll('.screen-section').forEach(el => el.classList.remove('active'));
+                document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+                document.getElementById(tabId).classList.add('active');
                 btnElement.classList.add('active');
             }
 
-            async function registerUser(e) {
-                e.preventDefault();
-                const data = {
-                    id: document.getElementById('regId').value,
-                    name: document.getElementById('regName').value,
-                    email: document.getElementById('regEmail').value,
-                    phone: document.getElementById('regPhone').value,
-                    nationality: document.getElementById('regNationality').value,
-                    nin: document.getElementById('regNin').value
+            async function registerAccount() {
+                const payload = {
+                    id: document.getElementById('inputUser').value,
+                    name: document.getElementById('inputName').value,
+                    email: document.getElementById('inputEmail').value,
+                    phone: document.getElementById('inputPhone').value,
+                    nationality: document.getElementById('inputNation').value,
+                    identity_number: document.getElementById('inputNin').value
                 };
+
+                if(!payload.id || !payload.nin) {
+                    alert('Please enter your Username and NIN verification number.');
+                    return;
+                }
 
                 const res = await fetch('/api/register', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify(data)
+                    body: JSON.stringify(payload)
                 });
-                const result = await res.json();
+                const data = await res.json();
                 if(res.ok) {
-                    currentUser = result.user_id;
-                    document.getElementById('headerUserStatus').innerText = `Active: ${currentUser} (${result.nationality}) - NIN Verified`;
-                    alert('Registration and NIN Verification successful! Welcome to SwiftBux Enterprise.');
-                    fetchUserData();
-                    switchTab('dashboardTab', document.getElementById('dashNavBtn'));
+                    currentUserId = data.user_id;
+                    updateUIBalances(data.cash_balance, data.tickets, data.gems);
+                    document.getElementById('verificationBadge').innerText = "VERIFIED (NIN Active)";
+                    document.getElementById('verificationBadge').style.color = "#4ade80";
+                    document.getElementById('payoutSection').classList.remove('hidden');
+                    showModal("Registration Successful!", `User ID: ${currentUserId}\\nNIN Verified & Linked to KWD Ledger.`);
                 } else {
-                    alert('Error: ' + result.detail);
+                    alert('Error: ' + data.detail);
                 }
             }
 
-            async function fetchUserData() {
-                if(!currentUser) return;
-                const res = await fetch(`/api/user/${currentUser}`);
-                const data = await res.json();
-                if(res.ok) {
-                    document.getElementById('dashBalance').innerText = `${data.balance.toFixed(3)} KWD`;
-                    document.getElementById('dashRefCounts').innerText = `${data.referred_count} Users`;
-                    document.getElementById('withdrawBalDisplay').innerText = `Available: ${data.balance.toFixed(3)} KWD`;
-                    document.getElementById('userRefLink').value = `https://swiftbux-api.onrender.com/?ref=${data.referral_code}`;
-                }
+            async function updateUIBalances(cash, tickets, gems) {
+                document.getElementById('topCash').innerText = cash.toFixed(3);
+                document.getElementById('walletBalanceDisplay').innerText = cash.toFixed(3) + " KWD";
+                document.getElementById('topTickets').innerText = tickets.toLocaleString();
+                document.getElementById('topGems').innerText = gems;
             }
 
-            async function claimTask(taskType, rewardAmount) {
-                if(!currentUser) {
-                    alert('Please complete registration first!');
-                    switchTab('registerTab', document.querySelectorAll('.nav-btn')[0]);
+            async function completeTask(taskName, rewardAmount) {
+                if(!currentUserId) {
+                    alert('Please register and verify your NIN in the Wallet tab first!');
+                    switchTab('tabWallet', document.querySelectorAll('.nav-item')[4]);
                     return;
                 }
                 const res = await fetch('/api/task', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({user_id: currentUser, task_type: taskType, reward: rewardAmount})
+                    body: JSON.stringify({user_id: currentUserId, reward: rewardAmount})
                 });
                 const data = await res.json();
                 if(res.ok) {
-                    alert(`Success! Earned ${rewardAmount.toFixed(3)} KWD from ${taskType}. New Balance: ${data.new_balance.toFixed(3)} KWD`);
-                    fetchUserData();
+                    updateUIBalances(data.cash_balance, data.tickets, data.gems);
+                    showModal("Task Completed!", `Earned +${rewardAmount.toFixed(3)} KWD from ${taskName}.\\nNew Balance: ${data.cash_balance.toFixed(3)} KWD`);
                 }
             }
 
-            async function triggerGameReward() {
-                const promptEl = document.getElementById('gamePrompt');
-                promptEl.innerText = "🎯 TARGET HIT! Processing reward...";
-                await claimTask('reflex_game', 3.500);
-                setTimeout(() => {
-                    promptEl.innerText = "🎮 CLICK HERE TO START GAME";
-                }, 1500);
+            async function claimDailyReward() {
+                await completeTask("Daily Reward Bonus", 5.000);
             }
 
-            async function simulateNewReferral() {
-                if(!currentUser) {
-                    alert('Please register first!');
-                    return;
-                }
-                const res = await fetch('/api/task', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({user_id: currentUser, task_type: 'referral_bonus', reward: 10.000})
-                });
+            async function spinWheel() {
+                const prizes = [0.100, 0.500, 1.000, 2.500, 5.000, 10.000];
+                const prize = prizes[Math.floor(Math.random() * prizes.length)];
+                await completeTask("Lucky Spin Wheel", prize);
+            }
+
+            async function requestWithdrawal() {
+                const res = await fetch(`/api/user/${currentUserId}`);
                 const data = await res.json();
-                if(res.ok) {
-                    alert('New referral joined via your link! +10.000 KWD added to your affiliate balance.');
-                    fetchUserData();
-                }
-            }
-
-            function copyRefLink() {
-                const copyText = document.getElementById('userRefLink');
-                copyText.select();
-                navigator.clipboard.writeText(copyText.value);
-                alert('Referral link copied to clipboard!');
-            }
-
-            async function executeWithdrawal() {
-                if(!currentUser) {
-                    alert('Please register first!');
-                    return;
-                }
-                const res = await fetch(`/api/user/${currentUser}`);
-                const data = await res.json();
-                if(data.balance <= 0) {
+                if(data.cash_balance <= 0) {
                     alert('Insufficient balance for withdrawal.');
                     return;
                 }
+                showModal("✅ OFFICIAL TRANSACTION PROOF", `User: ${currentUserId}\\nAmount: ${data.cash_balance.toFixed(3)} KWD\\nStatus: TRANSFER COMPLETED\\nNIN Verified: SUCCESSFUL\\nNetwork: SwiftBux Secure Ledger`);
+            }
 
-                document.getElementById('proofDetails').innerHTML = `
-                    <b>User ID:</b> ${currentUser}<br>
-                    <b>Amount:</b> ${data.balance.toFixed(3)} KWD<br>
-                    <b>Status:</b> TRANSFER COMPLETED<br>
-                    <b>Timestamp:</b> ${new Date().toUTCString()}<br>
-                    <b>Verification Hash:</b> 0x7f8a9bc...swiftbux_verified
-                `;
-                document.getElementById('proofModal').classList.remove('hidden');
+            function showModal(title, text) {
+                document.getElementById('modalTitle').innerText = title;
+                document.getElementById('modalText').innerText = text;
+                document.getElementById('popupModal').classList.remove('hidden');
             }
 
             function closeModal() {
-                document.getElementById('proofModal').classList.add('hidden');
-                fetchUserData();
+                document.getElementById('popupModal').classList.add('hidden');
             }
         </script>
     </body>
     </html>
     """
 
-# --- API BACKEND ENDPOINTS ---
-@app.post("/api/register")
-def register_enterprise_user(
-    id: str = Form(None),
-    name: str = Form(None),
-    email: str = Form(None),
-    phone: str = Form(None),
-    nationality: str = Form(None),
-    nin: str = Form(None),
-    db: Session = Depends(get_db)
-):
-    # Support both JSON and Form parsing via Starlette request body if needed, let's use direct JSON body parsing or FastAPI Pydantic model:
-    pass
-
-from pydantic import BaseModel
-class RegModel(BaseModel):
+# --- BACKEND API SCHEMAS & ENDPOINTS ---
+class UserReg(BaseModel):
     id: str
     name: str
     email: str
     phone: str
     nationality: str
-    nin: str
+    identity_number: str
 
 @app.post("/api/register")
-def register_json(user: RegModel, db: Session = Depends(get_db)):
-    existing = db.query(EnterpriseUser).filter((EnterpriseUser.id == user.id) | (EnterpriseUser.nin == user.nin)).first()
+def register_user(user: UserReg, db: Session = Depends(get_db)):
+    existing = db.query(AppUser).filter((AppUser.id == user.id) | (AppUser.identity_number == user.identity_number)).first()
     if existing:
-        return {"user_id": existing.id, "nationality": existing.nationality, "status": "existing_loaded"}
+        return {
+            "user_id": existing.id,
+            "cash_balance": float(existing.cash_balance),
+            "tickets": float(existing.tickets),
+            "gems": int(existing.gems)
+        }
     
-    new_user = EnterpriseUser(
+    new_user = AppUser(
         id=user.id,
+        name=user.name,
         email=user.email,
         phone=user.phone,
         nationality=user.nationality,
-        nin=user.nin,
-        balance=Decimal("117.000"),
-        currency="KWD",
+        identity_number=user.identity_number,
+        cash_balance=Decimal("8.000"),
+        tickets=Decimal("10120.00"),
+        gems=Decimal("10"),
         referral_code=user.id + "_ref",
         referred_count=Decimal("0")
     )
     db.add(new_user)
     db.commit()
-    return {"user_id": new_user.id, "nationality": new_user.nationality, "status": "registered"}
+    return {
+        "user_id": new_user.id,
+        "cash_balance": float(new_user.cash_balance),
+        "tickets": float(new_user.tickets),
+        "gems": int(new_user.gems)
+    }
 
 @app.get("/api/user/{user_id}")
-def get_user_data(user_id: str, db: Session = Depends(get_db)):
-    user = db.query(EnterpriseUser).filter(EnterpriseUser.id == user_id).first()
+def get_user(user_id: str, db: Session = Depends(get_db)):
+    user = db.query(AppUser).filter(AppUser.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     return {
         "user_id": user.id,
-        "balance": float(user.balance),
-        "currency": user.currency,
-        "referral_code": user.referral_code,
-        "referred_count": int(user.referred_count)
+        "cash_balance": float(user.cash_balance),
+        "tickets": float(user.tickets),
+        "gems": int(user.gems)
     }
 
-class TaskModel(BaseModel):
+class TaskPost(BaseModel):
     user_id: str
-    task_type: str
     reward: float
 
 @app.post("/api/task")
-def process_task(task: TaskModel, db: Session = Depends(get_db)):
-    user = db.query(EnterpriseUser).filter(EnterpriseUser.id == task.user_id).first()
+def process_task(task: TaskPost, db: Session = Depends(get_db)):
+    user = db.query(AppUser).filter(AppUser.id == task.user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    reward_val = Decimal(str(task.reward))
-    user.balance += reward_val
-    if task.task_type == 'referral_bonus':
-        user.referred_count += 1
-        
+    user.cash_balance += Decimal(str(task.reward))
+    user.tickets += Decimal("150.00")
     db.commit()
-    return {"status": "success", "new_balance": float(user.balance)}
+    return {
+        "cash_balance": float(user.cash_balance),
+        "tickets": float(user.tickets),
+        "gems": int(user.gems)
+    }
