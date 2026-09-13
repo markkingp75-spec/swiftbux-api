@@ -1,53 +1,46 @@
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.responses import HTMLResponse
 from decimal import Decimal
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from sqlalchemy import create_engine, Column, String, Numeric, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from pydantic import BaseModel
 
 # --- DATABASE SETUP ---
-SQLALCHEMY_DATABASE_URL = "sqlite:///./swiftbux_complete_hub.db"
+SQLALCHEMY_DATABASE_URL = "sqlite:///./swiftbux_temu_style.db"
 engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-class CompleteUser(Base):
-    __tablename__ = "complete_users"
+class TemuUser(Base):
+    __tablename__ = "temu_users"
     id = Column(String, primary_key=True, index=True)
     name = Column(String)
     email = Column(String, unique=True, index=True)
     phone = Column(String)
-    nationality = Column(String)
-    identity_number = Column(String, unique=True, index=True)
     shipping_address = Column(String)
     city = Column(String)
     country = Column(String)
-    cash_balance = Column(Numeric(10, 3), default=Decimal("0.000"))
-    mined_balance = Column(Numeric(10, 3), default=Decimal("0.000"))
-    mining_active = Column(String, default="false")
-    mining_start_time = Column(DateTime, nullable=True)
-    last_daily_claim = Column(DateTime, nullable=True)
-    bank_card_number = Column(String, default="")
+    earned_balance = Column(Numeric(10, 3), default=Decimal("0.000"))
     created_at = Column(DateTime, default=datetime.now(timezone.utc))
 
-class CompleteProduct(Base):
-    __tablename__ = "complete_products"
+class TemuProduct(Base):
+    __tablename__ = "temu_products"
     id = Column(String, primary_key=True, index=True)
     title = Column(String)
-    factory_name = Column(String)
+    factory_source = Column(String)
     origin = Column(String)
     price_usd = Column(Numeric(10, 2))
-    weight_kg = Column(Numeric(5, 2))
+    colors_json = Column(String) # e.g. "Red, Blue, Black"
+    sizes_json = Column(String)  # e.g. "Small, Medium, Large"
     category = Column(String)
     image_emoji = Column(String)
-    moq = Column(String)
     sold_count = Column(String)
 
 Base.metadata.create_all(bind=engine)
 
-app = FastAPI(title="SwiftBux Complete Global Marketplace & Earning Hub")
+app = FastAPI(title="SwiftBux Global E-Commerce & Earning Platform")
 
 def get_db():
     db = SessionLocal()
@@ -56,15 +49,15 @@ def get_db():
     finally:
         db.close()
 
-def seed_catalog(db: Session):
-    if db.query(CompleteProduct).count() == 0:
+def seed_temu_catalog(db: Session):
+    if db.query(TemuProduct).count() == 0:
         items = [
-            CompleteProduct(id="c1", title="Industrial 5G Smartphone Global Edition", factory_name="Shenzhen Semiconductor Works", origin="China", price_usd=65.00, weight_kg=0.4, category="Electronics", image_emoji="📱", moq="MOQ: 1 Unit", sold_count="15K+ sold"),
-            CompleteProduct(id="c2", title="All-Terrain Mountain Bike 21-Speed", factory_name="Hangzhou Industrial Assembly", origin="China", price_usd=45.00, weight_kg=14.0, category="Automotive", image_emoji="🚲", sold_count="6.2K+ sold"),
-            CompleteProduct(id="c3", title="USA Branded Smart Fitness Watch Pro V2", factory_name="California Tech Solutions", origin="United States", price_usd=32.00, weight_kg=0.2, category="Electronics", image_emoji="⌚", sold_count="9.1K+ sold"),
-            CompleteProduct(id="c4", title="Genuine Handcrafted Leather Briefcase", factory_name="New Delhi Export Artisans", origin="India", price_usd=28.00, weight_kg=1.5, category="Fashion", image_emoji="💼", sold_count="4.5K+ sold"),
-            CompleteProduct(id="c5", title="Luxury Ankara Traditional Fabric Bundle", factory_name="Lagos Textile Manufacturers", origin="Nigeria", price_usd=18.00, weight_kg=1.0, category="Fashion", image_emoji="🧵", sold_count="18K+ sold"),
-            CompleteProduct(id="c6", title="Heavy Duty Solar Power Generator 5kW", factory_name="Berlin Clean Energy Works", origin="Germany", price_usd=320.00, weight_kg=22.0, category="Industrial", image_emoji="⚡", sold_count="1.4K+ sold")
+            TemuProduct(id="p1", title="Industrial 5G Smartphone Global Edition", factory_source="Shenzhen Semiconductor Factory", origin="China", price_usd=65.00, colors_json="Black, Silver, Gold", sizes_json="128GB, 256GB", category="Electronics", image_emoji="📱", sold_count="15K+ sold"),
+            TemuProduct(id="p2", title="All-Terrain Mountain Bike 21-Speed", factory_source="Hangzhou Bicycle Works", origin="China", price_usd=45.00, colors_json="Red, Blue, Matte Black", sizes_json="Standard 26-inch", category="Automotive", image_emoji="🚲", sold_count="6.2K+ sold"),
+            TemuProduct(id="p3", title="USA Branded Smart Fitness Watch Pro V2", factory_source="California Tech Solutions", origin="United States", price_usd=32.00, colors_json="Black, White, Rose Gold", sizes_json="Adjustable", category="Electronics", image_emoji="⌚", sold_count="9.1K+ sold"),
+            TemuProduct(id="p4", title="Genuine Handcrafted Leather Briefcase", factory_source="New Delhi Export Artisans", origin="India", price_usd=28.00, colors_json="Brown, Dark Tan, Black", sizes_json="Standard", category="Fashion", image_emoji="💼", sold_count="4.5K+ sold"),
+            TemuProduct(id="p5", title="Luxury Ankara Traditional Fabric (10 Yards)", factory_source="Lagos Textile Manufacturers", origin="Nigeria", price_usd=18.00, colors_json="Multi-color Print", sizes_json="10 Yards", category="Fashion", image_emoji="🧵", sold_count="18K+ sold"),
+            TemuProduct(id="p6", title="Heavy Duty Solar Power Generator 5kW", factory_source="Berlin Clean Energy Works", origin="Germany", price_usd=320.00, colors_json="Industrial Gray", sizes_json="5kW Unit", category="Industrial", image_emoji="⚡", sold_count="1.4K+ sold")
         ]
         db.add_all(items)
         db.commit()
@@ -77,7 +70,7 @@ def read_root():
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>SwiftBux Global Marketplace & Earning Hub</title>
+        <title>SwiftBux Global E-Commerce & Earning Hub</title>
         <style>
             * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
             body { background: #f4f5f7; color: #333; min-height: 100vh; display: flex; flex-direction: column; }
@@ -107,15 +100,14 @@ def read_root():
             .tab-pane.active { display: block; }
 
             .prod-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 20px; margin-top: 20px; }
-            .prod-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; transition: 0.2s; }
+            .prod-card { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between; transition: 0.2s; cursor: pointer; }
             .prod-card:hover { box-shadow: 0 8px 20px rgba(0,0,0,0.08); transform: translateY(-2px); }
             .prod-img-box { background: #f8fafc; height: 160px; display: flex; align-items: center; justify-content: center; font-size: 55px; position: relative; }
             .prod-badge { position: absolute; top: 10px; left: 10px; background: #ff5000; color: white; font-size: 11px; padding: 3px 8px; border-radius: 4px; font-weight: bold; }
             .prod-info { padding: 15px; }
             .prod-title { font-size: 15px; font-weight: 600; color: #1e293b; margin-bottom: 6px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
             .prod-supplier { font-size: 12px; color: #64748b; margin-bottom: 8px; }
-            .prod-price { font-size: 18px; font-weight: bold; color: #ff5000; margin-bottom: 4px; }
-            .prod-freight { font-size: 12px; color: #475569; margin-bottom: 15px; }
+            .prod-price { font-size: 18px; font-weight: bold; color: #ff5000; margin-bottom: 15px; }
 
             .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-top: 15px; }
             .form-group { display: flex; flex-direction: column; gap: 6px; text-align: left; margin-bottom: 12px; }
@@ -129,77 +121,138 @@ def read_root():
 
             .card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px; text-align: left; margin-bottom: 20px; }
             .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; z-index: 1000; display: none; }
-            .modal-box { background: white; padding: 30px; border-radius: 12px; width: 450px; text-align: center; }
+            .modal-box { background: white; padding: 30px; border-radius: 12px; width: 480px; text-align: center; max-height: 90vh; overflow-y: auto; }
         </style>
     </head>
     <body>
 
         <div class="top-nav-bar">
             <div class="top-tabs">
-                <span class="active" onclick="switchTab('tabGlobal', this)">🌐 Marketplace & Shopping</span>
-                <span onclick="switchTab('tabMining', this)">⛏️ Mining & Daily Claims</span>
-                <span onclick="switchTab('tabGames', this)">🎮 Play & Earn Games</span>
-                <span onclick="switchTab('tabAds', this)">📺 Watch Videos & Earn</span>
+                <span class="active" onclick="switchTab('tabGlobal', this)">🛍️ Marketplace (Temu Style)</span>
+                <span onclick="switchTab('tabMining', this)">⛏️ Mining & Claims</span>
+                <span onclick="switchTab('tabGames', this)">🎮 Play Games</span>
+                <span onclick="switchTab('tabAds', this)">📺 Watch Videos</span>
                 <span onclick="switchTab('tabLogin', this)">🔐 Login / Register</span>
                 <span style="margin-left: auto; font-size: 13px; background: rgba(255,255,255,0.15); padding: 5px 14px; border-radius: 20px;" id="authStatusBadge">Guest Mode</span>
             </div>
             <div class="search-container">
                 <span style="color: #ff5000; font-size: 18px;">🔍</span>
-                <input type="text" id="searchInput" placeholder="Search products to buy with your bank card...">
+                <input type="text" id="searchInput" placeholder="Search clothes, bicycles, machines, electronics from worldwide factories...">
                 <button class="search-btn" onclick="searchCatalog()">SEARCH</button>
             </div>
         </div>
 
         <div class="category-grid">
-            <div class="cat-item" onclick="switchTab('tabGlobal', document.querySelectorAll('.nav-btn')[0])">
-                <div class="cat-icon">🛒</div>
-                <span>Buy Goods</span>
+            <div class="cat-item" onclick="filterCategory('All')">
+                <div class="cat-icon">🌍</div>
+                <span>All Worldwide</span>
             </div>
-            <div class="cat-item" onclick="switchTab('tabMining', document.querySelectorAll('.nav-btn')[2])">
-                <div class="cat-icon">⛏️</div>
-                <span>24H Mining</span>
+            <div class="cat-item" onclick="filterCategory('Electronics')">
+                <div class="cat-icon">📱</div>
+                <span>Electronics</span>
             </div>
-            <div class="cat-item" onclick="switchTab('tabMining', document.querySelectorAll('.nav-btn')[2])">
-                <div class="cat-icon">🎁</div>
-                <span>Daily Claim</span>
+            <div class="cat-item" onclick="filterCategory('Automotive')">
+                <div class="cat-icon">🚲</div>
+                <span>Automotive & Bikes</span>
             </div>
-            <div class="cat-item" onclick="switchTab('tabGames', document.querySelectorAll('.nav-btn')[3])">
-                <div class="cat-icon">🎮</div>
-                <span>Play Games</span>
+            <div class="cat-item" onclick="filterCategory('Fashion')">
+                <div class="cat-icon">👔</div>
+                <span>Clothes & Fashion</span>
             </div>
-            <div class="cat-item" onclick="switchTab('tabAds', document.querySelectorAll('.nav-btn')[4])">
-                <div class="cat-icon">📺</div>
-                <span>Watch & Earn</span>
+            <div class="cat-item" onclick="filterCategory('Industrial')">
+                <div class="cat-icon">⚡</div>
+                <span>Machines & Power</span>
             </div>
-            <div class="cat-item" onclick="switchTab('tabWallet', document.querySelectorAll('.nav-btn')[6])">
-                <div class="cat-icon">💳</div>
-                <span>Bank Card / Wallet</span>
+            <div class="cat-item" onclick="switchTab('tabSell', document.querySelectorAll('.nav-btn')[5])">
+                <div class="cat-icon">📦</div>
+                <span>Sell Product</span>
             </div>
         </div>
 
         <div class="main-layout">
             <div class="sidebar">
-                <button class="nav-btn active" onclick="switchTab('tabGlobal', this)">🌐 Marketplace (Buy Goods)</button>
-                <button class="nav-btn" onclick="switchTab('tabLogin', this)">🔐 Login / Register Profile</button>
-                <button class="nav-btn" onclick="switchTab('tabMining', this)">⛏️ 24H Mining & Daily Claims</button>
-                <button class="nav-btn" onclick="switchTab('tabGames', this)">🎮 Play & Earn Games</button>
+                <button class="nav-btn active" onclick="switchTab('tabGlobal', this)">🛍️ Worldwide Marketplace</button>
+                <button class="nav-btn" onclick="switchTab('tabMining', this)">⛏️ 24H Mining & Daily Claim</button>
+                <button class="nav-btn" onclick="switchTab('tabGames', this)">🎮 Play Games & Earn</button>
                 <button class="nav-btn" onclick="switchTab('tabAds', this)">📺 Watch Videos & Earn</button>
-                <button class="nav-btn" onclick="switchTab('tabWallet', this)">💳 Bank Card & Wallet</button>
+                <button class="nav-btn" onclick="switchTab('tabWallet', this)">💰 My Earnings & Wallet</button>
+                <button class="nav-btn" onclick="switchTab('tabLogin', this)">🔐 Login / Register Profile</button>
                 <button class="nav-btn" onclick="switchTab('tabSell', this)">🛒 List & Sell Product</button>
             </div>
 
             <div class="content-area">
-                <!-- TAB 1: MARKETPLACE & BUYING -->
+                <!-- TAB 1: MARKETPLACE -->
                 <div id="tabGlobal" class="tab-pane active">
-                    <h2 style="color: #1e293b; margin-bottom: 8px;">Worldwide Factory Marketplace</h2>
-                    <p style="color: #64748b; font-size: 14px; margin-bottom: 20px;">Browse and buy goods directly. When you click buy, you can securely pay using your saved bank card or backup payment method.</p>
+                    <h2 style="color: #1e293b; margin-bottom: 8px;">Worldwide Factory Direct Marketplace</h2>
+                    <p style="color: #64748b; font-size: 14px; margin-bottom: 20px;">Browse clothes, bicycles, electronics, and machines from China, US, and worldwide factories. Click any item to select colors, options, and buy!</p>
                     <div id="productContainer" class="prod-grid"></div>
                 </div>
 
-                <!-- TAB 2: LOGIN / REGISTER -->
+                <!-- TAB 2: MINING & EARNINGS -->
+                <div id="tabMining" class="tab-pane">
+                    <h2 style="color: #1e293b; margin-bottom: 8px;">24-Hour Mining & Daily Claim Rewards</h2>
+                    <p style="color: #64748b; font-size: 14px; margin-bottom: 20px;">Earn money for yourself by mining every 24 hours and claiming your daily rewards. Use your earnings to buy goods!</p>
+                    
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <div class="card" style="text-align: center;">
+                            <h3 style="color: #ff5000; margin-bottom: 10px;">⛏️ 24H Cloud Miner</h3>
+                            <p style="font-size: 14px; color: #64748b; margin-bottom: 15px;">Earned Balance: <span id="miningBalanceDisplay" style="font-weight: bold; color: #16a34a;">0.000</span> Tokens</p>
+                            <button class="btn-orange" onclick="startMining()">Start / Check 24H Mining</button>
+                        </div>
+                        <div class="card" style="text-align: center;">
+                            <h3 style="color: #16a34a; margin-bottom: 10px;">🎁 Daily Reward Claim</h3>
+                            <p style="font-size: 14px; color: #64748b; margin-bottom: 15px;">Claim your free daily streak bonus (+5.0 Tokens).</p>
+                            <button class="btn-orange" style="background: #16a34a;" onclick="claimDaily()">Claim Daily Reward</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 3: PLAY GAMES -->
+                <div id="tabGames" class="tab-pane">
+                    <h2 style="color: #1e293b; margin-bottom: 8px;">Play Mini-Games & Earn Cash</h2>
+                    <p style="color: #64748b; font-size: 14px; margin-bottom: 20px;">Play our rewards game to stack up your earnings for shopping.</p>
+                    
+                    <div class="card" style="text-align: center; max-width: 500px; margin: 0 auto;">
+                        <h3 style="color: #ff5000; margin-bottom: 10px;">🎮 Tap-to-Earn Coin Game</h3>
+                        <p style="font-size: 14px; color: #64748b; margin-bottom: 20px;">Tap the coin to earn +1.0 Token per tap!</p>
+                        <div style="font-size: 70px; cursor: pointer; margin-bottom: 20px;" onclick="playGameReward()">🪙</div>
+                        <p style="font-weight: bold; font-size: 16px;">Total Earned: <span id="gameScore" style="color: #16a34a;">0.000</span> Tokens</p>
+                    </div>
+                </div>
+
+                <!-- TAB 4: WATCH VIDEOS -->
+                <div id="tabAds" class="tab-pane">
+                    <h2 style="color: #1e293b; margin-bottom: 8px;">Watch Videos & Earn Money</h2>
+                    <p style="color: #64748b; font-size: 14px; margin-bottom: 20px;">Watch promotional videos to earn cash rewards directly to your account.</p>
+                    
+                    <div class="prod-grid">
+                        <div class="prod-card" style="padding: 15px;">
+                            <h3 style="font-size: 15px; color: #1e293b; margin-bottom: 8px;">📺 Global Factory Promo Video #1</h3>
+                            <p style="font-size: 12px; color: #64748b; margin-bottom: 15px;">Reward: +3.0 Tokens upon completion.</p>
+                            <button class="btn-orange" onclick="watchVideoReward('Global Factory Promo #1', 3.0)">Watch Video & Earn</button>
+                        </div>
+                        <div class="prod-card" style="padding: 15px;">
+                            <h3 style="font-size: 15px; color: #1e293b; margin-bottom: 8px;">📺 International Sourcing Showcase #2</h3>
+                            <p style="font-size: 12px; color: #64748b; margin-bottom: 15px;">Reward: +3.0 Tokens upon completion.</p>
+                            <button class="btn-orange" onclick="watchVideoReward('International Sourcing Showcase #2', 3.0)">Watch Video & Earn</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 5: WALLET & EARNINGS -->
+                <div id="tabWallet" class="tab-pane">
+                    <h2 style="color: #1e293b; margin-bottom: 8px;">My Earnings & Wallet</h2>
+                    <div class="card" style="max-width: 500px; margin: 0 auto; text-align: center;">
+                        <h3 style="color: #16a34a; font-size: 28px; margin-bottom: 10px;" id="walletBalance">0.000 Tokens</h3>
+                        <p style="font-size: 14px; color: #64748b; margin-bottom: 20px;">Use your earned tokens directly when buying goods, or keep playing games and mining to earn more!</p>
+                        <button class="btn-orange" onclick="switchTab('tabGlobal', document.querySelectorAll('.nav-btn')[0])">Go Shopping Now</button>
+                    </div>
+                </div>
+
+                <!-- TAB 6: LOGIN / REGISTER -->
                 <div id="tabLogin" class="tab-pane">
                     <h2 style="color: #1e293b; margin-bottom: 8px;">Account Login & Registration</h2>
-                    <p style="color: #64748b; font-size: 14px; margin-bottom: 20px;">Log in with your User ID, or create a new account to save your earnings and bank card.</p>
+                    <p style="color: #64748b; font-size: 14px; margin-bottom: 20px;">Log back in instantly using your User ID, or register a new account.</p>
 
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 30px;">
                         <div class="card">
@@ -232,20 +285,8 @@ def read_root():
                                     <label>Phone Number</label>
                                     <input type="text" id="regPhone" required>
                                 </div>
-                                <div class="form-group">
-                                    <label>Bank Card Number (for buying goods)</label>
-                                    <input type="text" id="regCard" placeholder="4123 4567 8901 2345" required>
-                                </div>
-                                <div class="form-group">
-                                    <label>Destination Country</label>
-                                    <select id="regNationality">
-                                        <option value="Nigeria">Nigeria (Doorstep Cargo)</option>
-                                        <option value="Kuwait">Kuwait</option>
-                                        <option value="International">International</option>
-                                    </select>
-                                </div>
                                 <div class="form-group full">
-                                    <label>Delivery Address</label>
+                                    <label>Delivery Street Address</label>
                                     <input type="text" id="regAddress" placeholder="Street Address / City" required>
                                 </div>
                                 <button type="submit" class="btn-orange" style="margin-top: 15px;">Register Account</button>
@@ -254,97 +295,36 @@ def read_root():
                     </div>
                 </div>
 
-                <!-- TAB 3: MINING & DAILY CLAIMS (EARNINGS) -->
-                <div id="tabMining" class="tab-pane">
-                    <h2 style="color: #1e293b; margin-bottom: 8px;">24-Hour Mining & Daily Reward Claims</h2>
-                    <p style="color: #64748b; font-size: 14px; margin-bottom: 20px;">Earn free tokens daily by starting your 24-hour mining cycle and claiming daily rewards!</p>
-                    
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                        <div class="card" style="text-align: center;">
-                            <h3 style="color: #ff5000; margin-bottom: 10px;">⛏️ 24-Hour Cloud Miner</h3>
-                            <p style="font-size: 14px; color: #64748b; margin-bottom: 15px;">Mined Earnings: <span id="minedBalanceDisplay" style="font-weight: bold; color: #16a34a;">0.000</span> Tokens</p>
-                            <button class="btn-orange" onclick="startMining()">Start / Check 24H Mining</button>
-                        </div>
-
-                        <div class="card" style="text-align: center;">
-                            <h3 style="color: #16a34a; margin-bottom: 10px;">🎁 Daily Reward Claim</h3>
-                            <p style="font-size: 14px; color: #64748b; margin-bottom: 15px;">Claim your free daily streak bonus of +5.0 Tokens.</p>
-                            <button class="btn-orange" style="background: #16a34a;" onclick="claimDaily()">Claim Daily Reward</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- TAB 4: PLAY & EARN GAMES -->
-                <div id="tabGames" class="tab-pane">
-                    <h2 style="color: #1e293b; margin-bottom: 8px;">Play & Earn Mini-Games</h2>
-                    <p style="color: #64748b; font-size: 14px; margin-bottom: 20px;">Play our interactive rewards game to boost your token balance instantly.</p>
-                    
-                    <div class="card" style="text-align: center; max-width: 500px; margin: 0 auto;">
-                        <h3 style="color: #ff5000; margin-bottom: 10px;">🎮 Tap-to-Earn Coin Game</h3>
-                        <p style="font-size: 14px; color: #64748b; margin-bottom: 20px;">Tap the coin below to earn +1.0 Token per tap!</p>
-                        <div style="font-size: 70px; cursor: pointer; margin-bottom: 20px;" onclick="playGameReward()">🪙</div>
-                        <p style="font-weight: bold; font-size: 16px;">Game Score / Earned: <span id="gameScore" style="color: #16a34a;">0.000</span> Tokens</p>
-                    </div>
-                </div>
-
-                <!-- TAB 5: WATCH VIDEOS & EARN -->
-                <div id="tabAds" class="tab-pane">
-                    <h2 style="color: #1e293b; margin-bottom: 8px;">Watch Videos & Ads to Earn</h2>
-                    <p style="color: #64748b; font-size: 14px; margin-bottom: 20px;">Watch sponsored promotional videos and ad campaigns to earn rewards straight to your wallet.</p>
-                    
-                    <div class="prod-grid">
-                        <div class="prod-card" style="padding: 15px;">
-                            <h3 style="font-size: 15px; color: #1e293b; margin-bottom: 8px;">📺 Global Factory Promo Video #1</h3>
-                            <p style="font-size: 12px; color: #64748b; margin-bottom: 15px;">Reward: +3.0 Tokens upon completion.</p>
-                            <button class="btn-orange" onclick="watchAdReward('Global Factory Promo #1', 3.0)">Watch Video & Earn</button>
-                        </div>
-                        <div class="prod-card" style="padding: 15px;">
-                            <h3 style="font-size: 15px; color: #1e293b; margin-bottom: 8px;">📺 International Sourcing Showcase #2</h3>
-                            <p style="font-size: 12px; color: #64748b; margin-bottom: 15px;">Reward: +3.0 Tokens upon completion.</p>
-                            <button class="btn-orange" onclick="watchAdReward('International Sourcing Showcase #2', 3.0)">Watch Video & Earn</button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- TAB 6: BANK CARD & WALLET -->
-                <div id="tabWallet" class="tab-pane">
-                    <h2 style="color: #1e293b; margin-bottom: 8px;">Bank Card & Wallet Management</h2>
-                    <div class="card" style="max-width: 500px; margin: 0 auto;">
-                        <h3 style="color: #16a34a; font-size: 24px; margin-bottom: 10px;" id="walletBalance">0.000 Tokens / KWD</h3>
-                        <p style="font-size: 13px; color: #64748b; margin-bottom: 15px;">Your saved bank card is used when buying goods from the marketplace.</p>
-                        <div class="form-group">
-                            <label>Saved Bank Card / Payment Backup</label>
-                            <input type="text" id="userBankCard" placeholder="Card Number on file">
-                        </div>
-                        <button class="btn-orange" onclick="updateBankCard()">Update Bank Card Backup</button>
-                    </div>
-                </div>
-
                 <!-- TAB 7: SELL PRODUCT -->
                 <div id="tabSell" class="tab-pane">
-                    <h2 style="color: #1e293b; margin-bottom: 8px;">List & Sell Your Products Worldwide</h2>
-                    <p style="color: #64748b; font-size: 14px; margin-bottom: 20px;">List your products on the marketplace.</p>
+                    <h2 style="color: #1e293b; margin-bottom: 8px;">List & Sell Your Products</h2>
+                    <p style="color: #64748b; font-size: 14px; margin-bottom: 20px;">Sell clothes, bicycles, machines, or items to worldwide buyers.</p>
                     <form onsubmit="postVendorProduct(event)" class="card">
                         <div class="form-grid">
                             <div class="form-group">
                                 <label>Product Title</label>
-                                <input type="text" id="sellTitle" placeholder="e.g. Luxury Car Body Cover" required>
+                                <input type="text" id="sellTitle" placeholder="e.g. Electric Power Machine" required>
                             </div>
                             <div class="form-group">
                                 <label>Price (USD)</label>
-                                <input type="number" step="0.01" id="sellPrice" placeholder="25.00" required>
+                                <input type="number" step="0.01" id="sellPrice" placeholder="50.00" required>
                             </div>
                             <div class="form-group">
                                 <label>Category</label>
                                 <select id="sellCategory">
-                                    <option value="Automotive">Automotive</option>
+                                    <option value="Automotive">Automotive & Bikes</option>
                                     <option value="Electronics">Electronics</option>
-                                    <option value="Fashion">Fashion</option>
+                                    <option value="Fashion">Fashion & Clothes</option>
+                                    <option value="Industrial">Machines & Industrial</option>
                                 </select>
                             </div>
                             <div class="form-group">
-                                <label>Weight (kg)</label>
-                                <input type="number" step="0.1" id="sellWeight" placeholder="1.0" required>
+                                <label>Available Colors (comma separated)</label>
+                                <input type="text" id="sellColors" placeholder="Red, Blue, Black" required>
+                            </div>
+                            <div class="form-group full">
+                                <label>Available Sizes / Specs</label>
+                                <input type="text" id="sellSizes" placeholder="Small, Medium, Large or Standard" required>
                             </div>
                         </div>
                         <button type="submit" class="btn-orange" style="margin-top: 15px;">Publish Product</button>
@@ -353,17 +333,43 @@ def read_root():
             </div>
         </div>
 
-        <!-- PAYMENT CHECKOUT MODAL -->
-        <div id="checkoutModal" class="modal-overlay">
+        <!-- TEMU STYLE PRODUCT DETAIL & CHECKOUT MODAL -->
+        <div id="productModal" class="modal-overlay">
             <div class="modal-box">
-                <h3 style="color: #1e293b; margin-bottom: 10px;">💳 Secure Bank Card Checkout</h3>
-                <p id="checkoutItemText" style="font-size: 13px; color: #64748b; margin-bottom: 15px;"></p>
-                <div class="form-group">
-                    <label>Confirm Bank Card / Backup Payment</label>
-                    <input type="text" id="checkoutCardInput" placeholder="Enter card number to pay">
+                <div id="modalEmoji" style="font-size: 60px; margin-bottom: 10px;">🛍️</div>
+                <h3 id="modalTitle" style="color: #1e293b; margin-bottom: 6px; font-size: 18px;"></h3>
+                <p id="modalSource" style="font-size: 12px; color: #64748b; margin-bottom: 10px;"></p>
+                <div id="modalPrice" style="font-size: 20px; font-weight: bold; color: #ff5000; margin-bottom: 15px;"></div>
+
+                <!-- Color Selection -->
+                <div class="form-group" style="text-align: left;">
+                    <label>Select Color / Style:</label>
+                    <select id="selectColor"></select>
                 </div>
-                <div style="display: flex; gap: 10px; margin-top: 15px;">
-                    <button class="btn-orange" style="background: #16a34a;" onclick="confirmPurchase()">Pay Now & Order</button>
+
+                <!-- Size Selection -->
+                <div class="form-group" style="text-align: left;">
+                    <label>Select Size / Option:</label>
+                    <select id="selectSize"></select>
+                </div>
+
+                <!-- Payment Method Choice -->
+                <div class="form-group" style="text-align: left; margin-top: 10px;">
+                    <label>Choose Payment Method:</label>
+                    <select id="selectPaymentMethod">
+                        <option value="bank_card">Pay with Bank Card / Backup Card</option>
+                        <option value="earned_balance">Pay with Earned Tokens / Balance</option>
+                    </select>
+                </div>
+
+                <!-- Bank Card Input (Shown only if bank card selected) -->
+                <div class="form-group" id="bankCardGroup" style="text-align: left;">
+                    <label>Enter Bank Card Number:</label>
+                    <input type="text" id="modalBankCard" placeholder="4123 4567 8901 2345">
+                </div>
+
+                <div style="display: flex; gap: 10px; margin-top: 20px;">
+                    <button class="btn-orange" style="background: #16a34a;" onclick="submitOrder()">Confirm & Buy Now</button>
                     <button class="btn-orange" style="background: #64748b;" onclick="closeModal()">Cancel</button>
                 </div>
             </div>
@@ -371,15 +377,14 @@ def read_root():
 
         <script>
             let currentUserId = localStorage.getItem('swiftbux_user_id') || null;
-            let currentSelectedItem = null;
-            let currentItemPrice = 0;
+            let activeProduct = null;
 
             function checkAuth() {
                 if(currentUserId) {
                     document.getElementById('authStatusBadge').innerText = "Logged In: " + currentUserId;
                     fetchUserData();
                 } else {
-                    document.getElementById('authStatusBadge').innerText = "Guest Mode";
+                    document.getElementById('authStatusBadge').innerText = "Guest Mode (Mining & Earning Enabled)";
                 }
             }
 
@@ -413,12 +418,9 @@ def read_root():
                     name: document.getElementById('regName').value,
                     email: document.getElementById('regEmail').value,
                     phone: document.getElementById('regPhone').value,
-                    bank_card_number: document.getElementById('regCard').value,
-                    nationality: document.getElementById('regNationality').value,
-                    identity_number: "NIN_" + Math.random(),
                     shipping_address: document.getElementById('regAddress').value,
                     city: "Lagos",
-                    country: document.getElementById('regNationality').value
+                    country: "Nigeria"
                 };
 
                 const res = await fetch('/api/register', {
@@ -431,7 +433,7 @@ def read_root():
                     currentUserId = data.user_id;
                     localStorage.setItem('swiftbux_user_id', currentUserId);
                     checkAuth();
-                    alert('Account created successfully!');
+                    alert('Account created successfully! You received 10 free starting tokens.');
                     switchTab('tabGlobal', document.querySelectorAll('.nav-btn')[0]);
                 } else {
                     alert('Error: ' + data.detail);
@@ -443,29 +445,28 @@ def read_root():
                 const res = await fetch(`/api/user?user_id=${currentUserId}`);
                 const data = await res.json();
                 if(res.ok) {
-                    document.getElementById('walletBalance').innerText = data.mined_balance.toFixed(3) + " Tokens";
-                    document.getElementById('minedBalanceDisplay').innerText = data.mined_balance.toFixed(3);
-                    document.getElementById('gameScore').innerText = data.mined_balance.toFixed(3);
-                    if(data.bank_card) document.getElementById('userBankCard').value = data.bank_card;
+                    document.getElementById('walletBalance').innerText = data.earned_balance.toFixed(3) + " Tokens";
+                    document.getElementById('miningBalanceDisplay').innerText = data.earned_balance.toFixed(3);
+                    document.getElementById('gameScore').innerText = data.earned_balance.toFixed(3);
                 }
             }
 
-            async function loadCatalog() {
-                const res = await fetch('/api/products');
+            async function loadCatalog(category = 'All') {
+                const res = await fetch(`/api/products?category=${category}`);
                 const items = await res.json();
                 let html = '';
                 items.forEach(i => {
                     html += `
-                        <div class="prod-card">
+                        <div class="prod-card" onclick='openProductModal(${JSON.stringify(i)})'>
                             <div class="prod-img-box">
                                 <div class="prod-badge">${i.sold_count}</div>
                                 <span>${i.image_emoji}</span>
                             </div>
                             <div class="prod-info">
                                 <div class="prod-title">${i.title}</div>
-                                <div class="prod-supplier">🏭 ${i.factory_name} (${i.origin})</div>
+                                <div class="prod-supplier">🏭 ${i.factory_source} (${i.origin})</div>
                                 <div class="prod-price">💲${i.price_usd.toFixed(2)} USD</div>
-                                <button class="btn-orange" onclick="openCheckout('${i.title}', ${i.price_usd})">Buy with Bank Card</button>
+                                <button class="btn-orange">Select Options & Buy</button>
                             </div>
                         </div>
                     `;
@@ -473,40 +474,108 @@ def read_root():
                 document.getElementById('productContainer').innerHTML = html;
             }
 
-            function openCheckout(title, price) {
-                if(!currentUserId) {
-                    alert('Please log in or register first before purchasing!');
-                    switchTab('tabLogin', document.querySelectorAll('.nav-btn')[1]);
-                    return;
-                }
-                currentSelectedItem = title;
-                currentItemPrice = price;
-                document.getElementById('checkoutItemText').innerText = `Item: ${title}\\nPrice: $${price.toFixed(2)} USD\\nPayment method will charge your saved bank card/backup.`;
-                document.getElementById('checkoutModal').style.display = 'flex';
+            function filterCategory(category) {
+                loadCatalog(category);
+                switchTab('tabGlobal', document.querySelectorAll('.nav-btn')[0]);
+            }
+
+            async function searchCatalog() {
+                const query = document.getElementById('searchInput').value.toLowerCase();
+                if(!query) { loadCatalog('All'); return; }
+                const res = await fetch('/api/products?category=All');
+                const items = await res.json();
+                const filtered = items.filter(i => i.title.toLowerCase().includes(query) || i.origin.toLowerCase().includes(query) || i.category.toLowerCase().includes(query));
+                
+                let html = '';
+                filtered.forEach(i => {
+                    html += `
+                        <div class="prod-card" onclick='openProductModal(${JSON.stringify(i)})'>
+                            <div class="prod-img-box">
+                                <div class="prod-badge">${i.sold_count}</div>
+                                <span>${i.image_emoji}</span>
+                            </div>
+                            <div class="prod-info">
+                                <div class="prod-title">${i.title}</div>
+                                <div class="prod-supplier">🏭 ${i.factory_source} (${i.origin})</div>
+                                <div class="prod-price">💲${i.price_usd.toFixed(2)} USD</div>
+                                <button class="btn-orange">Select Options & Buy</button>
+                            </div>
+                        </div>
+                    `;
+                });
+                document.getElementById('productContainer').innerHTML = html || '<p style="padding:20px; color:#64748b;">No products found.</p>';
+            }
+
+            function openProductModal(item) {
+                activeProduct = item;
+                document.getElementById('modalEmoji').innerText = item.image_emoji;
+                document.getElementById('modalTitle').innerText = item.title;
+                document.getElementById('modalSource').innerText = `Source: ${item.factory_source} (${item.origin})`;
+                document.getElementById('modalPrice').innerText = `$${item.price_usd.toFixed(2)} USD`;
+
+                // Populate colors
+                const colorSelect = document.getElementById('selectColor');
+                colorSelect.innerHTML = '';
+                item.colors.split(',').forEach(c => {
+                    colorSelect.innerHTML += `<option value="${c.trim()}">${c.trim()}</option>`;
+                });
+
+                // Populate sizes
+                const sizeSelect = document.getElementById('selectSize');
+                sizeSelect.innerHTML = '';
+                item.sizes.split(',').forEach(s => {
+                    sizeSelect.innerHTML += `<option value="${s.trim()}">${s.trim()}</option>`;
+                });
+
+                document.getElementById('productModal').style.display = 'flex';
             }
 
             function closeModal() {
-                document.getElementById('checkoutModal').style.display = 'none';
+                document.getElementById('productModal').style.display = 'none';
             }
 
-            async function confirmPurchase() {
-                const card = document.getElementById('checkoutCardInput').value;
+            async function submitOrder() {
+                if(!currentUserId) {
+                    alert('Please log in or register first to place your order!');
+                    closeModal();
+                    switchTab('tabLogin', document.querySelectorAll('.nav-btn')[5]);
+                    return;
+                }
+
+                const color = document.getElementById('selectColor').value;
+                const size = document.getElementById('selectSize').value;
+                const paymentMethod = document.getElementById('selectPaymentMethod').value;
+                const card = document.getElementById('modalBankCard').value;
+
+                if(paymentMethod === 'bank_card' && !card) {
+                    alert('Please enter your bank card or backup card number.');
+                    return;
+                }
+
                 const res = await fetch('/api/buy-goods', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({user_id: currentUserId, item: currentSelectedItem, price: currentItemPrice, card: card})
+                    body: JSON.stringify({
+                        user_id: currentUserId,
+                        item_id: activeProduct.id,
+                        color: color,
+                        size: size,
+                        payment_method: paymentMethod,
+                        bank_card: card
+                    })
                 });
                 const data = await res.json();
                 if(res.ok) {
-                    alert(`✅ Payment successful using bank card! Your order for "${currentSelectedItem}" has been placed.`);
+                    alert(`✅ Order Successful!\\nItem: ${activeProduct.title}\\nColor: ${color}, Size: ${size}\\nPaid via: ${paymentMethod === 'bank_card' ? 'Bank Card' : 'Earned Tokens'}\\nDoorstep delivery initiated.`);
                     closeModal();
+                    fetchUserData();
                 } else {
-                    alert('Payment Error: ' + data.detail);
+                    alert('Order Error: ' + data.detail);
                 }
             }
 
             async function startMining() {
-                if(!currentUserId) { alert('Please log in first!'); switchTab('tabLogin', document.querySelectorAll('.nav-btn')[1]); return; }
+                if(!currentUserId) { alert('Please log in first!'); switchTab('tabLogin', document.querySelectorAll('.nav-btn')[5]); return; }
                 const res = await fetch('/api/earn/mining', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
@@ -518,7 +587,7 @@ def read_root():
             }
 
             async function claimDaily() {
-                if(!currentUserId) { alert('Please log in first!'); switchTab('tabLogin', document.querySelectorAll('.nav-btn')[1]); return; }
+                if(!currentUserId) { alert('Please log in first!'); switchTab('tabLogin', document.querySelectorAll('.nav-btn')[5]); return; }
                 const res = await fetch('/api/earn/daily-claim', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
@@ -530,7 +599,7 @@ def read_root():
             }
 
             async function playGameReward() {
-                if(!currentUserId) { alert('Please log in first!'); switchTab('tabLogin', document.querySelectorAll('.nav-btn')[1]); return; }
+                if(!currentUserId) { alert('Please log in first!'); switchTab('tabLogin', document.querySelectorAll('.nav-btn')[5]); return; }
                 const res = await fetch('/api/earn/game', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
@@ -540,37 +609,27 @@ def read_root():
                 fetchUserData();
             }
 
-            async function watchAdReward(title, reward) {
-                if(!currentUserId) { alert('Please log in first!'); switchTab('tabLogin', document.querySelectorAll('.nav-btn')[1]); return; }
-                const res = await fetch('/api/earn/ad', {
+            async function watchVideoReward(title, reward) {
+                if(!currentUserId) { alert('Please log in first!'); switchTab('tabLogin', document.querySelectorAll('.nav-btn')[5]); return; }
+                const res = await fetch('/api/earn/video', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({user_id: currentUserId, reward: reward})
                 });
                 const data = await res.json();
                 fetchUserData();
-                alert(`📺 Watched "${title}" successfully! Earned +${reward} Tokens.`);
-            }
-
-            async function updateBankCard() {
-                if(!currentUserId) { alert('Please log in first!'); return; }
-                const card = document.getElementById('userBankCard').value;
-                const res = await fetch('/api/update-card', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({user_id: currentUserId, card: card})
-                });
-                alert('Bank card backup updated successfully!');
+                alert(`📺 Watched "${title}"! Earned +${reward} Tokens.`);
             }
 
             async function postVendorProduct(e) {
                 e.preventDefault();
-                if(!currentUserId) { alert('Please log in first!'); return; }
+                if(!currentUserId) { alert('Please log in first!'); switchTab('tabLogin', document.querySelectorAll('.nav-btn')[5]); return; }
                 const payload = {
                     title: document.getElementById('sellTitle').value,
                     price_usd: parseFloat(document.getElementById('sellPrice').value),
                     category: document.getElementById('sellCategory').value,
-                    weight_kg: parseFloat(document.getElementById('sellWeight').value),
+                    colors: document.getElementById('sellColors').value,
+                    sizes: document.getElementById('sellSizes').value,
                     seller: currentUserId
                 };
                 const res = await fetch('/api/sell', {
@@ -579,14 +638,14 @@ def read_root():
                     body: JSON.stringify(payload)
                 });
                 if(res.ok) {
-                    alert('Product listed successfully!');
-                    loadCatalog();
+                    alert('Product listed successfully to worldwide marketplace!');
+                    loadCatalog('All');
                     switchTab('tabGlobal', document.querySelectorAll('.nav-btn')[0]);
                 }
             }
 
             checkAuth();
-            loadCatalog();
+            loadCatalog('All');
         </script>
     </body>
     </html>
@@ -598,25 +657,21 @@ class UserReg(BaseModel):
     name: str
     email: str
     phone: str
-    nationality: str
-    identity_number: str
     shipping_address: str
     city: str
     country: str
-    bank_card_number: str
 
 @app.post("/api/register")
 def register_user(user: UserReg, db: Session = Depends(get_db)):
-    seed_catalog(db)
-    existing = db.query(CompleteUser).filter(CompleteUser.id == user.id).first()
+    seed_temu_catalog(db)
+    existing = db.query(TemuUser).filter(TemuUser.id == user.id).first()
     if existing:
         raise HTTPException(status_code=400, detail="User ID already exists.")
     
-    new_user = CompleteUser(
+    new_user = TemuUser(
         id=user.id, name=user.name, email=user.email, phone=user.phone,
-        nationality=user.nationality, identity_number=user.identity_number,
         shipping_address=user.shipping_address, city=user.city, country=user.country,
-        bank_card_number=user.bank_card_number, mined_balance=Decimal("10.000")
+        earned_balance=Decimal("15.000") # Starting bonus tokens
     )
     db.add(new_user)
     db.commit()
@@ -624,93 +679,96 @@ def register_user(user: UserReg, db: Session = Depends(get_db)):
 
 @app.get("/api/login")
 def login_user(user_id: str, db: Session = Depends(get_db)):
-    seed_catalog(db)
-    user = db.query(CompleteUser).filter(CompleteUser.id == user_id).first()
+    seed_temu_catalog(db)
+    user = db.query(TemuUser).filter(TemuUser.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
     return {"user_id": user.id}
 
 @app.get("/api/user")
 def get_user(user_id: str, db: Session = Depends(get_db)):
-    user = db.query(CompleteUser).filter(CompleteUser.id == user_id).first()
+    user = db.query(TemuUser).filter(TemuUser.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
-    return {"mined_balance": float(user.mined_balance), "bank_card": user.bank_card_number}
+    return {"earned_balance": float(user.earned_balance)}
 
 @app.get("/api/products")
-def get_products(db: Session = Depends(get_db)):
-    seed_catalog(db)
-    items = db.query(CompleteProduct).all()
+def get_products(category: str = "All", db: Session = Depends(get_db)):
+    seed_temu_catalog(db)
+    query = db.query(TemuProduct)
+    if category != "All":
+        query = query.filter(TemuProduct.category == category)
+    items = query.all()
     return [{
-        "id": i.id, "title": i.title, "factory_name": i.factory_name, "origin": i.origin,
-        "price_usd": float(i.price_usd), "image_emoji": i.image_emoji, "sold_count": i.sold_count
+        "id": i.id, "title": i.title, "factory_source": i.factory_source, "origin": i.origin,
+        "price_usd": float(i.price_usd), "colors": i.colors_json, "sizes": i.sizes_json,
+        "category": i.category, "image_emoji": i.image_emoji, "sold_count": i.sold_count
     } for i in items]
 
 @app.post("/api/buy-goods")
 def buy_goods(data: dict, db: Session = Depends(get_db)):
-    user = db.query(CompleteUser).filter(CompleteUser.id == data.get("user_id")).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found.")
+    user = db.query(TemuUser).filter(TemuUser.id == data.get("user_id")).first()
+    product = db.query(TemuProduct).filter(TemuProduct.id == data.get("item_id")).first()
+    if not user or not product:
+        raise HTTPException(status_code=404, detail="User or Product not found.")
+    
+    if data.get("payment_method") == "earned_balance":
+        if user.earned_balance < product.price_usd:
+            raise HTTPException(status_code=400, detail="Insufficient earned balance! Play games, mine, or watch videos to earn more, or pay with your bank card.")
+        user.earned_balance -= product.price_usd
+        db.commit()
+    
     return {"status": "success"}
 
 @app.post("/api/earn/mining")
 def earn_mining(data: dict, db: Session = Depends(get_db)):
-    user = db.query(CompleteUser).filter(CompleteUser.id == data.get("user_id")).first()
+    user = db.query(TemuUser).filter(TemuUser.id == data.get("user_id")).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
-    user.mined_balance += Decimal("12.500")
+    user.earned_balance += Decimal("12.500")
     db.commit()
     return {"message": "⛏️ 24H Mining reward claimed (+12.5 Tokens)!"}
 
 @app.post("/api/earn/daily-claim")
 def earn_daily(data: dict, db: Session = Depends(get_db)):
-    user = db.query(CompleteUser).filter(CompleteUser.id == data.get("user_id")).first()
+    user = db.query(TemuUser).filter(TemuUser.id == data.get("user_id")).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
-    user.mined_balance += Decimal("5.000")
+    user.earned_balance += Decimal("5.000")
     db.commit()
     return {"message": "🎁 Daily reward successfully claimed (+5.0 Tokens)!"}
 
 @app.post("/api/earn/game")
 def earn_game(data: dict, db: Session = Depends(get_db)):
-    user = db.query(CompleteUser).filter(CompleteUser.id == data.get("user_id")).first()
+    user = db.query(TemuUser).filter(TemuUser.id == data.get("user_id")).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
-    user.mined_balance += Decimal("1.000")
+    user.earned_balance += Decimal("1.000")
     db.commit()
     return {"status": "success"}
 
-@app.post("/api/earn/ad")
-def earn_ad(data: dict, db: Session = Depends(get_db)):
-    user = db.query(CompleteUser).filter(CompleteUser.id == data.get("user_id")).first()
+@app.post("/api/earn/video")
+def earn_video(data: dict, db: Session = Depends(get_db)):
+    user = db.query(TemuUser).filter(TemuUser.id == data.get("user_id")).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
     reward = Decimal(str(data.get("reward", 3.0)))
-    user.mined_balance += reward
-    db.commit()
-    return {"status": "success"}
-
-@app.post("/api/update-card")
-def update_card(data: dict, db: Session = Depends(get_db)):
-    user = db.query(CompleteUser).filter(CompleteUser.id == data.get("user_id")).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found.")
-    user.bank_card_number = data.get("card", "")
+    user.earned_balance += reward
     db.commit()
     return {"status": "success"}
 
 @app.post("/api/sell")
 def sell_product(data: dict, db: Session = Depends(get_db)):
-    new_item = CompleteProduct(
+    new_item = TemuProduct(
         id="item_" + str(datetime.now().timestamp()),
         title=data.get("title"),
-        factory_name="Vendor: " + data.get("seller"),
+        factory_source="Vendor: " + data.get("seller"),
         origin="Global",
         price_usd=Decimal(str(data.get("price_usd"))),
-        weight_kg=Decimal(str(data.get("weight_kg", 1.0))),
+        colors_json=data.get("colors", "Standard"),
+        sizes_json=data.get("sizes", "Standard"),
         category=data.get("category"),
         image_emoji="🛍️",
-        moq="MOQ: 1 Unit",
         sold_count="New Listing"
     )
     db.add(new_item)
